@@ -4,6 +4,7 @@
 #include<unistd.h>
 #include<sys/wait.h>
 #include<stdlib.h>
+#include <fcntl.h>
 int main(int argc, char *argv[])
 {
 char line[100];
@@ -55,11 +56,38 @@ char line[100];
       }
       continue;
     }
+
+    char * fileName = NULL;
+    bool NoFileName = false;
+    for(int i = 0; i< counter; i++){
+      if(strcmp(words[i],">") == 0){
+        if(words[i+1] == NULL){
+          fprintf(stderr,"No file name\n");
+          NoFileName = true;
+          break;
+        }
+        fileName =  words[i+1];
+        words[i] = NULL ;
+        break;
+      }
+    }
+    if(NoFileName) continue;
     pid_t pid = fork();
     if(pid <0){
       perror("Error fork");
       continue;
     } else if(pid ==0){
+      if(fileName != NULL){
+        int fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if(fd < 0){
+          perror("Error open");
+          exit(1);
+        } else {
+          dup2(fd,1);
+          close(fd);
+        }
+           
+      }
       execvp(words[0],words);
       perror("Error execvp");
       exit(1);
