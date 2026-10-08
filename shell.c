@@ -72,6 +72,7 @@ char line[100];
       }
     }
     if(NoFileName) continue;
+
     pid_t pid = fork();
     if(pid <0){
       perror("Error fork");
@@ -86,7 +87,6 @@ char line[100];
           dup2(fd,1);
           close(fd);
         }
-           
       }
       execvp(words[0],words);
       perror("Error execvp");
