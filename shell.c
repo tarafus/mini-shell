@@ -58,6 +58,25 @@ bool find_redirection(char **words, int counter, char **fileName){
   return true;
 
 }
+
+int find_pipe(char **words, int counter){
+  for(int i = 0; i< counter; i++){
+    if(words[i] == NULL) continue;
+    if(strcmp(words[i],"|") == 0){
+      if(i == 0){
+        fprintf(stderr,"No first command\n");
+        return -2;
+      }
+      if(words[i+1] == NULL){
+        fprintf(stderr,"No command\n");
+        return -2;/*bad command*/
+      }
+      words[i] = NULL ;
+      return i;
+    }
+  }
+  return -1; /*no pipe*/
+}
 void execute(char ** words, char *fileName){
   pid_t pid = fork();
   if(pid <0){
@@ -81,6 +100,51 @@ void execute(char ** words, char *fileName){
     waitpid(pid,NULL,0);
   }
 
+}
+void execute_pipe(char **cmd1, char **cmd2){
+  int fd[2];
+  int result = pipe(fd);
+  if(result == -1){
+    perror("pipe error");
+    return;
+  } 
+  pid_t pid1 = fork();
+  if(pid1 < 0){
+    perror("fork pid1 error");
+    close(fd[0]);
+    close(fd[1]);
+    return;
+  }
+  if(pid1 == 0){
+    dup2(fd[1],1);
+    close(fd[0]);
+    close(fd[1]);
+    execvp(cmd1[0],cmd1);
+    perror("error execvp pid1");
+    exit(1);
+  }
+  pid_t pid2 = fork();
+
+  if(pid2 < 0){
+    perror("fork pid2 error");
+    close(fd[0]);
+    close(fd[1]);
+    waitpid(pid1,NULL,0);
+    return;
+  }
+  if(pid2 == 0){
+    dup2(fd[0],0);
+    close(fd[0]);
+    close(fd[1]);
+    execvp(cmd2[0],cmd2);
+    perror("error execvp pid2");
+    exit(1);
+  }
+  close(fd[0]);
+  close(fd[1]);
+
+  waitpid(pid1,NULL,0);
+  waitpid(pid2,NULL,0);
 }
 int main(int argc, char *argv[])
 {
@@ -111,6 +175,12 @@ int main(int argc, char *argv[])
 
     char * fileName = NULL;
     if(!find_redirection(words, counter, &fileName)) continue;
+    int pipePos = find_pipe(words, counter);
+    if (pipePos == -2) continue;
+    if (pipePos >= 0) {
+      execute_pipe(words, &words[pipePos + 1]);
+      continue;
+    }
     execute(words,fileName);
 
   }
